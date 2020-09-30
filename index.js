@@ -10,8 +10,6 @@ app.use(morgan(':method :url :status :res[content-length] - :response-time ms :p
 
 morgan.token('post', (req, res) => { return JSON.stringify(req.body) })
 
-
-
 let persons = [
     {
         id: 1,
@@ -35,6 +33,7 @@ let persons = [
     }
 ]
 
+app.get('/'), (req, res) => res.send('<p>hello</p>')
 app.get('/info', (req, res) => res.send(`<p>Phonebook has info for ${persons.length} people<p><p>${new Date()}</p>`))
 app.get('/api/persons', (req, res) => res.json(persons))
 app.get('/api/persons/:id', (request, response) => {
