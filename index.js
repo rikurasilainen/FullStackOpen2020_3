@@ -1,77 +1,77 @@
+
 const express = require('express')
 const app = express()
 const morgan = require('morgan')
+require('dotenv').config()
 const cors = require('cors')
+const Person = require('./models/person')
 
 app.use(express.json())
 app.use(express.static('build'))
 app.use(cors())
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :post'))
+morgan.token('post', (request, response) => { return JSON.stringify(request.body) })
 
-morgan.token('post', (req, res) => { return JSON.stringify(req.body) })
-
-let persons = [
-    {
-        id: 1,
-        name: 'Arto Hellas',
-        number: '040-123456'
-    },
-    {
-        id: 2,
-        name: 'Ada Lovelace',
-        number: '39-44-5323523'
-    },
-    {
-        id: 3,
-        name: 'Dan Abramov', 
-        number: '12-43-234345'
-    },
-    {
-        id: 4,
-        name: 'Mary Poppendick',
-        number: '39-23-6423122'
-    }
-]
-
-app.get('/'), (req, res) => res.send('<p>hello</p>')
-app.get('/info', (req, res) => res.send(`<p>Phonebook has info for ${persons.length} people<p><p>${new Date()}</p>`))
-app.get('/api/persons', (req, res) => res.json(persons))
-app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    const person = persons.find(person => person.id === id)
-
-    if (person) {
-        response.json(person)
-    } else {
-        response.status(404).end()
-    }
-})
-
-app.delete('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id)
-    if (persons.some(person => person.id === id)) {
-        persons = persons.filter(person => person.id !== id)
-        response.status(204).end()
-    } else {
-        return response.status(400).json({
-            error: "id doesn't exist or was already deleted"
+app.get('/info', (request, response, next) => {
+    Person.find()
+        .then(persons => {
+            response.send(`<p>Phonebook has info for ${persons.length} people</p><p>${new Date()}</p>`)
         })
-    }
+        .catch(error => next(error))
 })
 
-const randomId = () => {
-    const r = Math.floor(Math.random() * 9999999) + 1
-    return r
-}
+app.get('/api/persons', (request, response, next) => {
+    Person.find({}).then(persons => {
+        response.json(persons)
+    })
+        .catch(error => next(error))
+})
 
-app.post('/api/persons/', (request, response) => {
+app.get('/api/persons/:id', (request, response, next) => {
+    Person.findById(request.params.id).then(person => {
+        if (person) {
+            response.json(person)
+        } else {
+            response.status(400).end()
+        }
+    })
+        .catch(error => next(error))
+})
+
+//this doesn't work -> should check frontend already deleted error message and functionality
+app.put('api/persons/:id', (request, response, next) => {
+    const body = request.body
+    console.log(body)
+    const person = {
+        name: body.name,
+        number: body.number
+    }
+
+    console.log(person)
+
+    Person.findByIdAndUpdate(request.params.id, person, { new: true })
+        .then(updatedPerson => {
+            console.log(updatedPerson)
+            response.json(updatedPerson)
+        })
+        .catch(error => next(error))
+})
+
+app.delete('/api/persons/:id', (request, response, next) => {
+    Person.findByIdAndRemove(request.params.id)
+        .then(result => {
+            response.status(204).end()
+        })
+        .catch(error => next(error))
+})
+
+/*//random id generator
+const randomId = () => { return Math.floor(Math.random() * 9999999) + 1}*/
+
+app.post('/api/persons/', (request, response, next) => {
     const body = request.body
 
-    if (persons.some(person => person.name === (body.name))) {
-        return response.status(400).json({
-            error: 'name must be unique'
-        })
-    } else if (!body.name) {
+    if (!body.name) {
         return response.status(400).json({
             error: 'name missing'
         })
@@ -81,17 +81,35 @@ app.post('/api/persons/', (request, response) => {
         })
     }
 
-    const person = {
-        id: randomId(),
+    const person = new Person({
+        //id: randomId(),
         name: body.name,
         number: body.number
-    }
+    })
 
-    persons = persons.concat(person)
-    response.json(person)
+    person.save().then(savedPerson => {
+        response.json(savedPerson)
+    })
+        .catch(error => next(error))
 })
 
-const PORT = process.env.PORT || 3001
+const unknownEndpoint = (request, response) => {
+    response.status(404).send({error: 'unknown endpoint'})
+}
+
+app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+    console.log(error.message)
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id' })
+    }
+    next(error)
+}
+
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
