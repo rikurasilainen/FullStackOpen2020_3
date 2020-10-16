@@ -38,20 +38,15 @@ app.get('/api/persons/:id', (request, response, next) => {
         .catch(error => next(error))
 })
 
-//this doesn't work -> should check frontend already deleted error message and functionality
-app.put('api/persons/:id', (request, response, next) => {
+app.put('/api/persons/:id', (request, response, next) => {
     const body = request.body
-    console.log(body)
     const person = {
         name: body.name,
         number: body.number
     }
 
-    console.log(person)
-
     Person.findByIdAndUpdate(request.params.id, person, { new: true })
         .then(updatedPerson => {
-            console.log(updatedPerson)
             response.json(updatedPerson)
         })
         .catch(error => next(error))
@@ -94,7 +89,7 @@ app.post('/api/persons/', (request, response, next) => {
 })
 
 const unknownEndpoint = (request, response) => {
-    response.status(404).send({error: 'unknown endpoint'})
+    response.status(404).send({ error: 'unknown endpoint' })
 }
 
 app.use(unknownEndpoint)
@@ -102,7 +97,9 @@ app.use(unknownEndpoint)
 const errorHandler = (error, request, response, next) => {
     console.log(error.message)
     if (error.name === 'CastError') {
-        return response.status(400).send({ error: 'malformatted id' })
+        return response.status(400).send({ error: 'Malformatted id' })
+    } else if (error.name === 'ValidationError') {
+        return response.status(400).json({error: error.message})
     }
     next(error)
 }
